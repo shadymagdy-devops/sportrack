@@ -1,0 +1,105 @@
+---
+# ansible/site.yml
+# Master playbook — provisions all infrastructure
+#
+# Usage:
+#   ansible-playbook -i inventory.ini site.yml
+#   ansible-playbook -i inventory.ini site.yml --tags docker
+#   ansible-playbook -i inventory.ini site.yml --limit masters
+
+- name: 🏗️  Provision all nodes — common baseline
+  hosts: k8s
+  become: yes
+  roles:
+    - common
+    - docker
+    - k8s
+
+- name: 🎛️  Initialize Kubernetes master
+  hosts: masters
+  become: yes
+  tasks:
+    - name: Check if cluster is already initialized
+      stat:
+        path: /etc/kubernetes/admin.conf
+      register: kubeadm_init
+
+    - name: Initialize Kubernetes cluster
+      command: >
+        kubeadm init
+        --pod-network-cidr=10.244.0.0/16
+        --apiserver-advertise-address={{ ansible_default_ipv4.address }}
+      when: not kubeadm_init.stat.exists
+      register: kubeadm_result
+
+    - name: Create .kube directory for ubuntu user
+      file:
+        path: /home/ubuntu/.kube
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: "0755"
+
+    - name: Copy admin.conf to ubuntu's .kube/config
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /home/ubuntu/.kube/config
+        remote_src: yes
+        owner: ubuntu
+        group: ubuntu
+        mode: "0600"
+
+    - name: Install Flannel CNI (pod networking)
+      become: no
+      command: kubectl apply -f https://raw.githubusercontent.com/flannel-io/flannel/master/Documentation/kube-flannel.yml
+
+    - name: Get join command for workers
+      command: kubeadm token create --print-join-command
+      register: join_command
+      when: not kubeadm_init.stat.exists
+
+    - name: Save join command to local file
+      local_action:
+        module: copy
+        content: "{{ join_command.stdout }}"
+        dest: /tmp/k8s_join_command.sh
+      when: join_command.stdout is defined
+
+- name: 🤝 Join worker nodes to cluster
+  hosts: workers
+  become: yes
+  tasks:
+    - name: Check if already joined
+      stat:
+        path: /etc/kubernetes/kubelet.conf
+      register: kubelet_conf
+
+    - name: Join cluster
+      command: "{{ lookup('file', '/tmp/k8s_join_command.sh') }}"
+      when: not kubelet_conf.stat.exists
+
+- name: 🚀 Deploy SportTrack application
+  hosts: masters
+  become: no
+  tasks:
+    - name: Copy k8s manifests to master
+      copy:
+        src: ../k8s/
+        dest: /home/ubuntu/sporttrack-k8s/
+
+    - name: Apply all manifests
+      command: kubectl apply -k /home/ubuntu/sporttrack-k8s/base/
+
+    - name: Wait for API deployment
+      command: kubectl rollout status deployment/sporttrack-api -n sporttrack --timeout=180s
+
+    - name: Wait for Frontend deployment
+      command: kubectl rollout status deployment/sporttrack-frontend -n sporttrack --timeout=180s
+
+    - name: Show all pods
+      command: kubectl get pods -n sporttrack
+      register: pods_output
+
+    - name: Print pod status
+      debug:
+        msg: "{{ pods_output.stdout_lines }}"

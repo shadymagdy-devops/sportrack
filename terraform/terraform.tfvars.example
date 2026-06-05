@@ -1,0 +1,9 @@
+# terraform/terraform.tfvars.example
+# Copy to terraform.tfvars and fill in your values
+# NEVER commit terraform.tfvars to git (it's in .gitignore)
+
+aws_region      = "us-east-1"
+project_name    = "sporttrack"
+worker_count    = 1             # 1 worker = stay in free tier (1 master + 1 worker = 2 x t2.micro)
+public_key_path = "~/.ssh/sporttrack-key.pub"
+my_ip_cidr      = "YOUR.IP.HERE/32"   # run: curl ifconfig.me

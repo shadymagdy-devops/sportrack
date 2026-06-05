@@ -1,0 +1,29 @@
+# Node / React
+frontend/node_modules/
+frontend/build/
+frontend/.env.local
+frontend/.env.*.local
+
+# .NET
+backend/**/.vs/
+backend/**/bin/
+backend/**/obj/
+backend/**/*.user
+backend/**/*.suo
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/*.tfvars        # contains secrets!
+terraform/.terraform.lock.hcl
+
+# Ansible
+ansible/*.retry
+ansible/.vault_pass
+
+# General
+.DS_Store
+*.log
+*.env
+.env

@@ -1,0 +1,59 @@
+---
+# ansible/roles/docker/tasks/main.yml
+# Installs Docker Engine on all nodes
+
+- name: Add Docker GPG key
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+  become: yes
+
+- name: Add Docker repository
+  apt_repository:
+    repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    state: present
+  become: yes
+
+- name: Install Docker Engine
+  apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+    update_cache: yes
+  become: yes
+
+- name: Configure containerd for Kubernetes (use systemd cgroup driver)
+  copy:
+    content: |
+      version = 2
+      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+        [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
+          SystemdCgroup = true
+    dest: /etc/containerd/config.toml
+  become: yes
+  notify: restart containerd
+
+- name: Enable and start Docker
+  systemd:
+    name: docker
+    enabled: yes
+    state: started
+  become: yes
+
+- name: Enable and start containerd
+  systemd:
+    name: containerd
+    enabled: yes
+    state: started
+  become: yes
+
+- name: Add ubuntu user to docker group
+  user:
+    name: ubuntu
+    groups: docker
+    append: yes
+  become: yes
