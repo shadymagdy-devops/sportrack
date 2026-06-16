@@ -1,0 +1,18 @@
+# ansible/group_vars/all.yml
+---
+app_name: sporttrack
+docker_version: "5:26.1.4~3-0~ubuntu-noble"
+k8s_version: "1.30"
+
+# Docker Hub
+dockerhub_username: "YOUR_DOCKERHUB_USERNAME"
+
+# App images
+api_image: "{{ dockerhub_username }}/sporttrack-api:latest"
+frontend_image: "{{ dockerhub_username }}/sporttrack-frontend:latest"
+
+# Postgres (override in host_vars or vault for prod)
+db_host: "postgres-svc"
+db_name: "sporttrack"
+db_user: "postgres"
+db_password: "postgres"           # use ansible-vault in production!
